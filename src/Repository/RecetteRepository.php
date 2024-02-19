@@ -22,7 +22,7 @@ class RecetteRepository extends ServiceEntityRepository
         parent::__construct($registry, Recette::class);
     }
 
-    public function getOneById(int $id, User $user)
+   /* public function getOneById(int $id, User $user)
     {
         return $this->createQueryBuilder('t')
             ->select('t.id,t.titre,t.description,t.etat')
@@ -32,7 +32,7 @@ class RecetteRepository extends ServiceEntityRepository
             ->setParameter('user', $user)
             ->getQuery()
             ->getOneOrNullResult();
-    }
+    }*/
 
     public function getAll(User $user): ?array
     {

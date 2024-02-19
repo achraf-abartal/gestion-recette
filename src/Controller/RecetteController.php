@@ -3,7 +3,9 @@
 namespace App\Controller;
 
 use App\Entity\Recette;
+use App\Repository\RecetteRepository;
 use App\Service\Recette\RecetteServiceInterface;
+use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -14,48 +16,85 @@ use Symfony\Component\Routing\Attribute\Route;
 class RecetteController extends AbstractController
 {
     public function __construct(
-        private readonly RecetteServiceInterface $recetteService
+        private readonly RecetteServiceInterface $recetteService,
+        private readonly EntityManagerInterface $entityManager,
+        private readonly RecetteRepository        $recetteRepository,
     )
     {
     }
-
-    #[Route('recette', methods: 'POST')]
-    public function addRecette(Request $request): JsonResponse
+    #[Route('', name: 'list_app',methods: 'GET')]
+    public function getAll(): Response
     {
-        $data = json_decode($request->getContent());
+        $recettes = $this->recetteRepository->findAll();
 
-        return $this->recetteService->add($data);
+        return $this->render('recette/list.html.twig', [
+            'recettes' => $recettes,
+        ]);
+    }
+    #[Route('recette',name: "add_recette", methods: 'POST')]
+    public function addRecette(Request $request):Response
+    {
+        $Recette = new Recette();
+
+        $form = $this->createFormBuilder($Recette)
+            ->add('descriptions', TextType::class)
+            ->add('date', DateTimeImmutable::class)
+            ->add('save', SubmitType::class, ['label' => 'Valider'])
+            ->getForm();
+
+        $form->handleRequest($request);
+        if ($form->isSubmitted() && $form->isValid()) {
+
+            $Recette = $form->getData();
+
+            $em = $this->getDoctrine()->getManager();
+            $em->persist($Recette);
+            $em->flush();
+
+        }
+
+        return $this->render('recette/ajouter.html.twig', [
+            'form' => $form->createView(),
+        ]);
     }
 
     #[Route('recette/{id}', methods: 'PUT')]
-    public function update(int $id, Request $request): Response
+    public function update(int $id, Recette $recette,Request $request): Response
     {
-        $data = json_decode($request->getContent());
+        $form = $this->createForm(RecetteType::class, $recette);
+        $form->handleRequest($request);
 
-        return $this->recetteService->update($id, $data);
+        if ($form->isSubmitted() && $form->isValid()) {
+            $this->getDoctrine()->getManager()->flush();
+
+            return $this->redirectToRoute('list_app', [], Response::HTTP_SEE_OTHER);
+        }
+
+        return $this->renderForm('recette/edit.html.twig', [
+            'recette' => $recette,
+            'form' => $form,
+        ]);
     }
 
     #[Route('recette/{id}', methods: 'DELETE')]
     public function remove(int $id): Response
     {
-        $this->recetteService->remove($id);
+        $recette = $this->recetteRepository->find($id);
 
-        return new JsonResponse('Supprimé avec succès', Response::HTTP_OK, ['Content-Type' => 'application/json']);
+        $this->entityManager->remove($recette);
+        $this->entityManager->flush();
+        return $this->redirectToRoute('list_app');
     }
 
-    #[Route('recette/{id}', methods: 'GET')]
+    #[Route('recette/{id}',name: 'list_recette', methods: 'GET')]
     public function getOne(int $id): Response
     {
-        $recette = $this->recetteService->getOne($id);
+        $recettes = $this->recetteRepository->findBy($id);
 
-        return new JsonResponse($recette, Response::HTTP_OK, ['Content-Type' => 'application/json']);
+        return $this->render('recette/list.html.twig', [
+            'recettes' => $recettes,
+        ]);
     }
 
-    #[Route('recettes', methods: 'GET')]
-    public function getAll(): Response
-    {
-        $recettes = $this->recetteService->getAll();
 
-        return new JsonResponse($recettes, Response::HTTP_OK, ['Content-Type' => 'application/json']);
-    }
 }
